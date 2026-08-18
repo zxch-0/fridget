@@ -23,7 +23,7 @@ export default function SearchBar({ large = false, initial = '', autoFocus = fal
         value={q}
         onChange={(e) => setQ(e.target.value)}
         autoFocus={autoFocus}
-        placeholder="Un produit, une marque, « petit-déj pas cher »…"
+        placeholder="Un produit, une marque, un code-barres…"
         className={`w-full rounded-full border border-forest-900/10 bg-white pl-11 pr-28 text-ink shadow-card placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-mint-500 ${
           large ? 'h-14 text-base' : 'h-11 text-sm'
         }`}
