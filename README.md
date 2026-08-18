@@ -81,10 +81,11 @@ src/             React + Vite + Tailwind
 public/          visuels, PWA, ticket exemple
 ```
 
-- `server/catalog.js` — produits, enseignes, grilles
-- `server/engine.js` — recherche, intentions, optimisation
-- `server/receipt.js` — parseur de ticket FR + matching
+- `src/lib/openprices.js` — client Open Prices (prix réels)
+- `src/lib/chains.js` — rattachement enseigne (Lidl, Leclerc…)
+- `server/receipt.js` — parseur de ticket FR
 - `src/lib/ocr.js` — prétraitement image + Tesseract
+- `GET /api/live/*` — relais Open Prices si besoin
 
 ## Licence
 

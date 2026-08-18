@@ -1,14 +1,21 @@
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api.js';
-import { euro } from '../lib/format.js';
-import { useApp } from '../lib/store.jsx';
+import { CHAINS } from '../lib/chains.js';
+import { euro, when } from '../lib/format.js';
+import { compareLive } from '../lib/openprices.js';
+
+const BASKETS = [
+  { id: 'famille', name: 'Courses famille' },
+  { id: 'etudiant', name: 'Semaine étudiant' },
+  { id: 'petit-dej', name: 'Petit-déjeuner' },
+  { id: 'apero', name: 'Apéro' },
+];
 
 export default function Compare() {
-  const { stores, baskets } = useApp();
   const [picked, setPicked] = useState(['lidl', 'leclerc', 'carrefour']);
   const [basketId, setBasketId] = useState('famille');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
 
   const toggle = (id) => {
     setPicked((cur) => {
@@ -22,9 +29,10 @@ export default function Compare() {
     if (picked.length < 2) return;
     let alive = true;
     setLoading(true);
-    api
-      .compare(picked, basketId)
+    setErr('');
+    compareLive(picked, basketId)
       .then((d) => alive && setData(d))
+      .catch((e) => alive && setErr(e.message || 'Impossible de charger les relevés'))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
@@ -32,23 +40,18 @@ export default function Compare() {
   }, [picked.join(','), basketId]);
 
   const cols = data?.columns || [];
-  const min = Math.min(...cols.map((c) => c.total), Infinity);
+  const min = Math.min(...cols.filter((c) => c.missing === 0).map((c) => c.total), Infinity);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest-600">Comparateur</p>
-      <h1 className="mt-1 font-serif text-3xl text-forest-950 md:text-4xl">Même chariot, trois enseignes.</h1>
+      <h1 className="mt-1 font-serif text-3xl text-forest-950 md:text-4xl">Même chariot, vrais relevés.</h1>
       <p className="mt-2 max-w-2xl text-ink/65">
-        On prend un panier type (ou le vôtre plus tard) et on le valorise dans chaque magasin, équivalents marques distributeurs compris.
+        Chaque case est un prix photographié (Open Prices). Un trou signifie : pas de relevé récent pour ce code-barres dans cette enseigne.
       </p>
 
       <div className="mt-6 flex flex-wrap gap-2">
-        {(baskets.length ? baskets : [
-          { id: 'famille', name: 'Courses famille' },
-          { id: 'etudiant', name: 'Semaine étudiant' },
-          { id: 'petit-dej', name: 'Petit-déjeuner' },
-          { id: 'apero', name: 'Apéro' },
-        ]).map((b) => (
+        {BASKETS.map((b) => (
           <button
             key={b.id}
             type="button"
@@ -63,7 +66,7 @@ export default function Compare() {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {stores.map((s) => (
+        {CHAINS.slice(0, 10).map((s) => (
           <button
             key={s.id}
             type="button"
@@ -78,7 +81,8 @@ export default function Compare() {
         ))}
       </div>
 
-      {loading && <p className="mt-8 text-sm text-ink/50">Calcul des chariots…</p>}
+      {loading && <p className="mt-8 text-sm text-ink/50">Collecte des relevés Open Prices…</p>}
+      {err && <p className="mt-8 text-sm text-tomato">{err}</p>}
 
       {cols.length > 0 && (
         <div className="mt-8 overflow-x-auto rounded-[1.6rem] bg-white ring-1 ring-forest-900/8">
@@ -107,7 +111,11 @@ export default function Compare() {
                     return (
                       <td key={c.storeId} className={`px-4 py-2.5 price-num ${best ? 'font-semibold text-forest-700' : ''}`}>
                         {line?.available ? euro(line.price) : '—'}
-                        {line?.promo && <span className="ml-1 text-[10px] text-tomato">{line.promo.label}</span>}
+                        {line?.date && (
+                          <span className="mt-0.5 block text-[10px] font-sans font-normal text-ink/40">
+                            {line.city} · {when(line.date)}
+                          </span>
+                        )}
                       </td>
                     );
                   })}
@@ -116,11 +124,11 @@ export default function Compare() {
             </tbody>
             <tfoot>
               <tr className="bg-cream-100 font-serif text-lg">
-                <td className="px-4 py-3">Total</td>
+                <td className="px-4 py-3">Total relevé</td>
                 {cols.map((c) => (
-                  <td key={c.storeId} className={`px-4 py-3 price-num ${c.total === min ? 'text-forest-700' : ''}`}>
+                  <td key={c.storeId} className={`px-4 py-3 price-num ${c.missing === 0 && c.total === min ? 'text-forest-700' : ''}`}>
                     {euro(c.total)}
-                    {c.total === min && <span className="ml-2 font-sans text-[10px] font-bold uppercase">gagnant</span>}
+                    {c.missing > 0 && <span className="ml-2 font-sans text-[10px] text-ink/45">{c.missing} trou(s)</span>}
                   </td>
                 ))}
               </tr>
@@ -131,7 +139,7 @@ export default function Compare() {
 
       {data?.all && (
         <div className="mt-8">
-          <h2 className="font-serif text-2xl">Classement complet</h2>
+          <h2 className="font-serif text-2xl">Classement (moins de trous, puis moins cher)</h2>
           <ol className="mt-3 space-y-2">
             {data.all.map((s, i) => (
               <li key={s.storeId} className="flex items-center justify-between rounded-2xl bg-white px-4 py-2.5 ring-1 ring-forest-900/8">
@@ -139,9 +147,11 @@ export default function Compare() {
                   <span className="w-5 font-mono text-xs text-ink/40">{i + 1}</span>
                   <i className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
                   {s.store}
-                  <span className="text-xs text-ink/40">{s.type}</span>
                 </span>
-                <span className="price-num font-semibold">{euro(s.total)}</span>
+                <span className="price-num font-semibold">
+                  {euro(s.total)}
+                  {s.missing > 0 && <span className="ml-2 text-xs font-normal text-ink/40">{s.missing} manquant(s)</span>}
+                </span>
               </li>
             ))}
           </ol>

@@ -43,7 +43,19 @@ export function AppProvider({ children }) {
           next[i] = { ...next[i], qty: next[i].qty + qty };
           return next;
         }
-        return [...cur, { id: product.id, name: product.name, brand: product.brand, emoji: product.emoji, size: product.size, qty }];
+        return [
+          ...cur,
+          {
+            id: product.code || product.id,
+            code: product.code || product.id,
+            name: product.name,
+            brand: product.brand,
+            emoji: product.emoji,
+            image: product.image,
+            size: product.size,
+            qty,
+          },
+        ];
       });
       setToast(`${product.name} ajouté au panier`);
     };

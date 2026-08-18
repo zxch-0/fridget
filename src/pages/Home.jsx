@@ -4,20 +4,18 @@ import { Link } from 'react-router-dom';
 import ProductCard from '../components/ProductCard.jsx';
 import SearchBar from '../components/SearchBar.jsx';
 import StoreBadge from '../components/StoreBadge.jsx';
-import { api } from '../lib/api.js';
-import { euro } from '../lib/format.js';
+import { CHAINS } from '../lib/chains.js';
+import { fetchStats, latestDeals } from '../lib/openprices.js';
 import { useApp } from '../lib/store.jsx';
 
 export default function Home() {
-  const { stores, stats, recent } = useApp();
+  const { recent } = useApp();
   const [deals, setDeals] = useState([]);
-  const [week, setWeek] = useState(null);
+  const [liveStats, setLiveStats] = useState(null);
 
   useEffect(() => {
-    api.deals().then((d) => {
-      setDeals(d.deals || []);
-      setWeek(d.week);
-    }).catch(() => {});
+    latestDeals(8).then(setDeals).catch(() => {});
+    fetchStats().then(setLiveStats).catch(() => {});
   }, []);
 
   return (
@@ -27,20 +25,20 @@ export default function Home() {
           <div className="rise">
             <p className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-forest-700 ring-1 ring-forest-900/10">
               <Sparkles className="h-3.5 w-3.5" />
-              IA courses · France
+              Prix réels · Open Prices
             </p>
             <h1 className="mt-5 font-serif text-4xl leading-[1.05] text-forest-950 sm:text-5xl md:text-[3.4rem]">
               Vos courses,
               <span className="italic text-forest-600"> au juste prix.</span>
             </h1>
             <p className="mt-4 max-w-md text-base text-ink/70 md:text-lg">
-              Fridget lit un ticket de caisse, reconnaît les produits et vous dit où ils sont moins chers — Lidl, Leclerc, Carrefour et le reste.
+              Fridget interroge les relevés citoyens d’Open Prices (étiquettes et tickets photographiés en magasin). Chaque prix a une date et une ville.
             </p>
             <div className="mt-6">
               <SearchBar large />
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              {['lait demi-écrémé', 'Nutella 400g', 'panier étudiant', 'papier toilette'].map((s) => (
+              {['lait demi-écrémé', 'Nutella 400g', 'Coca-Cola 1.5', 'panier étudiant'].map((s) => (
                 <Link
                   key={s}
                   to={`/recherche?q=${encodeURIComponent(s)}`}
@@ -73,12 +71,12 @@ export default function Home() {
               alt="Cuisine et frigo vintage, courses du marché"
               className="aspect-[4/3] w-full rounded-[2rem] object-cover shadow-lift ring-1 ring-forest-900/10"
             />
-            <div className="absolute -bottom-4 left-4 right-6 rounded-2xl bg-white/95 p-3 shadow-card ring-1 ring-forest-900/8 backdrop-blur sm:left-auto sm:right-6 sm:w-64">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-forest-600">Ticket type · Carrefour</p>
+            <div className="absolute -bottom-4 left-4 right-6 rounded-2xl bg-white/95 p-3 shadow-card ring-1 ring-forest-900/8 backdrop-blur sm:left-auto sm:right-6 sm:w-72">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-forest-600">Open Prices · France</p>
               <p className="font-serif text-xl text-forest-950">
-                {demoSave != null ? `− ${euro(demoSave)} chez Lidl` : 'Lidl reprend la main'}
+                {liveStats ? `${(liveStats.prices / 1000).toFixed(0)} k relevés` : 'Relevés citoyens'}
               </p>
-              <p className="text-xs text-ink/60">Sur 10 produits du ticket démo</p>
+              <p className="text-xs text-ink/60">Prix photographiés en magasin, pas une grille inventée.</p>
             </div>
           </div>
         </div>
@@ -86,10 +84,10 @@ export default function Home() {
 
       <section className="border-y border-forest-900/8 bg-white/50">
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-4 py-8 md:grid-cols-4">
-          <Stat k={stats.stores || 10} l="enseignes" />
-          <Stat k={`${stats.products || 110}+`} l="produits suivis" />
-          <Stat k={`${stats.avgSpread || 24} %`} l="d’écart moyen" />
-          <Stat k={`S${week || stats.week || '—'}`} l="promos de la semaine" />
+          <Stat k={liveStats ? liveStats.prices.toLocaleString('fr-FR') : '…'} l="prix relevés" />
+          <Stat k={liveStats ? liveStats.products.toLocaleString('fr-FR') : '…'} l="produits avec un prix" />
+          <Stat k={liveStats ? liveStats.locations.toLocaleString('fr-FR') : '…'} l="magasins" />
+          <Stat k="ODbL" l="données ouvertes OFF" />
         </div>
       </section>
 
@@ -97,25 +95,25 @@ export default function Home() {
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-forest-600">Comment ça marche</p>
         <h2 className="mt-2 font-serif text-3xl text-forest-950">Trois gestes, un frigo moins cher.</h2>
         <div className="mt-8 grid gap-4 md:grid-cols-3">
-          <Step icon={Sparkles} n="01" t="Demandez à l’IA" d="Tapez un produit, une marque ou un menu (« petit-déj », « semaine étudiant »). Fridget comprend le besoin." />
-          <Step icon={ScanLine} n="02" t="Scannez le ticket" d="Choisissez l’enseigne, photographiez le reçu. La lecture se fait sur votre appareil." />
-          <Step icon={Wallet} n="03" t="Voyez l’économie" d="Chaque ligne est comparée. On vous dit où aller — ou s’il ne vaut pas le détour." />
+          <Step icon={Sparkles} n="01" t="Cherchez un vrai prix" d="Marque, format ou code-barres. On interroge Open Prices, pas une moyenne inventée." />
+          <Step icon={ScanLine} n="02" t="Scannez le ticket" d="La photo reste sur l’appareil. Chaque ligne est recoupée avec les derniers relevés en France." />
+          <Step icon={Wallet} n="03" t="Voyez l’écart" d="Date, ville, enseigne : vous savez si le détour vaut le coup — ou si le relevé est trop vieux." />
         </div>
       </section>
 
       <section className="mx-auto max-w-6xl px-4 pb-14">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-forest-600">Cette semaine</p>
-            <h2 className="mt-2 font-serif text-3xl text-forest-950">Les écarts qui valent le clic</h2>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-forest-600">Promos relevées</p>
+            <h2 className="mt-2 font-serif text-3xl text-forest-950">Les derniers prix barrés</h2>
           </div>
-          <Link to="/recherche?q=promo" className="hidden text-sm font-semibold text-forest-700 md:inline">
-            Tout voir
+          <Link to="/recherche?q=nutella" className="hidden text-sm font-semibold text-forest-700 md:inline">
+            Chercher
           </Link>
         </div>
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {deals.slice(0, 4).map((d) => (
-            <ProductCard key={d.product.id} product={d.product} />
+          {deals.slice(0, 4).map((p) => (
+            <ProductCard key={p.code} product={p} />
           ))}
         </div>
       </section>
@@ -126,7 +124,7 @@ export default function Home() {
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-mint-400">Ticket de caisse</p>
             <h2 className="mt-2 font-serif text-3xl md:text-4xl">Posez le ticket. On fait le reste.</h2>
             <p className="mt-3 text-cream-200/75">
-              Photo ou import, Fridget extrait les lignes, rattache chaque produit à une famille (lait 1 L, PQ x12…) et compare le prix payé aux neuf autres enseignes.
+              Photo ou import, Fridget extrait les lignes puis les compare aux prix réellement photographiés dans les autres enseignes.
             </p>
             <Link
               to="/scan"
@@ -147,16 +145,15 @@ export default function Home() {
       <section className="mx-auto max-w-6xl px-4 py-14">
         <div className="flex items-center gap-2">
           <Store className="h-4 w-4 text-forest-600" />
-          <h2 className="font-serif text-3xl text-forest-950">Les enseignes suivies</h2>
+          <h2 className="font-serif text-3xl text-forest-950">Enseignes reconnues</h2>
         </div>
         <p className="mt-2 max-w-xl text-ink/65">
-          Prix indicatifs calés sur le positionnement réel : discount, indépendants, hypers, urbain. Les promos tournent chaque semaine.
+          Dès qu’un relevé Open Prices mentionne le magasin, on le rattache. D’autres enseignes apparaissent aussi, au fil des photos.
         </p>
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {stores.map((s) => (
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+          {CHAINS.slice(0, 16).map((s) => (
             <div key={s.id} className="rounded-2xl bg-white p-3 ring-1 ring-forest-900/8">
               <StoreBadge store={s} color={s.color} />
-              <p className="mt-2 text-[11px] leading-snug text-ink/55">{s.note}</p>
             </div>
           ))}
         </div>

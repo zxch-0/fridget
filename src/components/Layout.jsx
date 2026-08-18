@@ -59,10 +59,15 @@ export default function Layout() {
           <div>
             <Logo dark />
             <p className="mt-3 max-w-sm text-sm text-cream-200/70">
-              L’IA qui lit vos tickets et compare les enseignes. Vos photos restent sur l’appareil.
+              Prix réels via Open Prices (Open Food Facts, licence ODbL). Vos photos de ticket restent sur l’appareil.
             </p>
           </div>
-          <p className="text-xs text-cream-200/50">© {new Date().getFullYear()} Fridget · Prix indicatifs, mis à jour chaque semaine.</p>
+          <p className="text-xs text-cream-200/50">
+            © {new Date().getFullYear()} Fridget · données{' '}
+            <a className="underline" href="https://prices.openfoodfacts.org" target="_blank" rel="noreferrer">
+              Open Prices
+            </a>
+          </p>
         </div>
       </footer>
 

@@ -3,7 +3,8 @@ import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import StoreBadge from '../components/StoreBadge.jsx';
 import { api } from '../lib/api.js';
-import { euro } from '../lib/format.js';
+import { euro, when } from '../lib/format.js';
+import { enrichReceipt } from '../lib/openprices.js';
 import { readReceipt } from '../lib/ocr.js';
 import { useApp } from '../lib/store.jsx';
 
@@ -27,8 +28,10 @@ export default function Scan() {
     setBusy(true);
     try {
       const text = await readReceipt(file, setStatus);
-      setStatus('Comparaison des enseignes…');
-      const analysis = await api.receipt({ text, storeId });
+      setStatus('Lecture du ticket…');
+      const parsed = await api.receipt({ text, storeId });
+      setStatus('Croisement avec les prix réels…');
+      const analysis = await enrichReceipt(parsed);
       setResult(analysis);
       saveScan({ storeId, paid: analysis.paid, save: analysis.saveVsPaid, count: analysis.items.length });
     } catch (e) {
@@ -46,7 +49,9 @@ export default function Scan() {
     setPreview('/sample-receipt.jpg');
     setStatus('Lecture du ticket exemple…');
     try {
-      const analysis = await api.receipt({ demo: true, storeId: 'carrefour' });
+      const parsed = await api.receipt({ demo: true, storeId: 'carrefour' });
+      setStatus('Croisement avec les prix réels Open Prices…');
+      const analysis = await enrichReceipt(parsed);
       setResult(analysis);
       saveScan({ storeId: 'carrefour', paid: analysis.paid, save: analysis.saveVsPaid, count: analysis.items.length, demo: true });
     } catch (e) {
@@ -144,7 +149,7 @@ export default function Scan() {
               <Upload className="h-5 w-5 text-forest-700" />
               <p className="mt-3 font-serif text-xl text-forest-950">En attendant</p>
               <p className="mt-1">
-                Le ticket démo (Carrefour Market, 12/08/2026) est déjà calé sur le catalogue. C’est le plus simple pour voir l’économie.
+                Le ticket démo est lu, puis chaque ligne est comparée aux <strong>vrais relevés</strong> Open Prices (date + ville).
               </p>
               {store && (
                 <p className="mt-3 text-xs">
@@ -219,15 +224,17 @@ function ResultPanel({ result, onAdd }) {
                 </div>
                 <p className="price-num shrink-0">{euro(item.price)}</p>
               </div>
-              {item.best && item.savingIfBest > 0.05 && (
+              {item.best && (
                 <p className="mt-1 font-sans text-[11px] text-tomato">
-                  {euro(item.best.price)} chez {item.best.store} · {euro(item.savingIfBest)} de moins
+                  {euro(item.best.price)} chez {item.best.store}
+                  {item.best.city ? ` (${item.best.city})` : ''} · {when(item.best.date)}
+                  {item.savingIfBest > 0.05 ? ` · ${euro(item.savingIfBest)} de moins` : ''}
                 </p>
               )}
               {item.match && (
                 <button
                   type="button"
-                  onClick={() => onAdd(item.match)}
+                  onClick={() => onAdd(item.live || item.match)}
                   className="mt-1 font-sans text-[11px] font-semibold text-forest-700"
                 >
                   + au panier

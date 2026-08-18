@@ -105,6 +105,26 @@ app.get('/api/product-exists/:id', (req, res) => {
   res.json({ ok: Boolean(getProduct(req.params.id)) });
 });
 
+/** Relais Open Prices (si le navigateur ne peut pas l'appeler). */
+app.use('/api/live', async (req, res) => {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
+  const target = `https://prices.openfoodfacts.org/api/v1${req.url}`;
+  try {
+    const r = await fetch(target, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'Fridget/1.0 (https://github.com/zxch-0/fridget)',
+      },
+    });
+    const text = await r.text();
+    res.status(r.status);
+    res.set('Content-Type', r.headers.get('content-type') || 'application/json');
+    res.send(text);
+  } catch (err) {
+    res.status(502).json({ error: 'Open Prices injoignable depuis le serveur', detail: String(err.message || err) });
+  }
+});
+
 if (fs.existsSync(dist)) {
   app.use(express.static(dist, { maxAge: '1h', extensions: ['html'] }));
   app.get('*', (req, res, next) => {
